@@ -1,6 +1,7 @@
 """
-This file contains the definitions of the hypha and mycelium classes.
-These classes are used to encode the mycelium in the simulation of the process.
+This file contains the definitions of the hypha and mycelium classes and a function to plot the simulated mycelium.
+These classes are used to encode the mycelium in the simulation of the process and the plot function.
+
 """
 
 import numpy as np
