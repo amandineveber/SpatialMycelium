@@ -1,19 +1,28 @@
+"""
+This files contains:
+  - a simulation to study the evolution of number of apex, crossing and branching during the simulation
+  - two simulation to study qualitatively the effect of b1 and b2 on the aspect of the mycelium
+"""
+
 import numpy as np
 from time import time
 import matplotlib.pyplot as plt
-from simu_space_v5_final import hypha, mycelium, simulate_mycelium, simulate_mycelium_to_n
-from simu_space_v5_final import plot_mycelium, coordinate, n_cross
-
 from sklearn.metrics import mean_squared_error
-#%%
+
+from mycelium_space import hypha, mycelium, simulate_mycelium, simulate_mycelium_to_n
+from mycelium_space import plot_mycelium, coordinate
+
+
+#%% Data
 theta_e = -10*np.pi/180
 theta_0 = 71*np.pi/180
-#theta_dep = [2*i*np.pi/3 for i in range(3)]
 theta_dep = [np.pi/6, 3*np.pi/4, 3*np.pi/2]
-#theta_p = np.pi/2
 theta_p = theta_0
 
-#%%
+
+
+#%% Simulation 
+
 def simulate_mycelium_step(b1, b2, Tmax,
                            n_points=10, print_time=True):
     """
@@ -147,7 +156,10 @@ def simulation(b1, b2, Tmax, n_points, n_myc, to_plot = True, to_print = True):
 
 #%% Function to calculate the mycelium's summary statistics
 
-def ray(S):
+
+#Radius of the mycelium
+
+def rad(S):
     """
     Calculates the maximal distance between the origin of the mycelium and the 
     apex. 
@@ -163,99 +175,166 @@ def ray(S):
         dist = max(dist, S[i][2]**2 + S[i][3]**2)
     return dist
 
-def ray(S):
-    return max(S[:][2]**2 + S[:][3]**3)
+def rad(S):
+    return max(S[:][2]**2 + S[:][3]**2)
+
+
+
+#Number of crossing of the hypha
+
+def ccw(A, B, C):
+    return (C[1]-A[1]) * (B[0]-A[0]) > (B[1]-A[1]) * (C[0]-A[0])
+
+# Return true if line segments AB and CD intersect
+
+
+def test(A, B, C, D):
+    return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
+
+
+def intersect(H1, H2):
+    A = [H1[0], H1[1]]
+    B = [H1[2], H1[3]]
+    C = [H2[0], H2[1]]
+    D = [H2[2], H2[3]]
+    return test(A, B, C, D) and test(B, A, C, D)
+
+
+def n_cross(S, print_time=False):
+    """
+    Counts the number of crossings in the mycelium
+
+    Parameters
+    ----------
+    S (List): Coordinates of each hyphe [xd, yd, xa, ya].
+
+    Returns
+    -------
+    n_cross
+    """
+    t = time()
+    n_cross = 0
+    l = len(S)
+    for i in range(l):
+        for j in range(i+1, l):
+            n_cross += intersect(S[i], S[j])
+    if print_time:
+        print(time() - t)
+    return n_cross
+
 
 #%% Qualitative description of the role of b1
+
 n_max = 500
 B1 = [0.01, 0.04, 0.07, 0.1, 0.4]
 B1 = np.linspace(0.01, 0.5, 10)
-M = np.zeros((3, len(B1)))
 n_myc = 5
-for i in range(len(B1)):
-    t = time()
-    print(f"start {i}th it")
-    for j in range(n_myc):
-        b1 = B1[i]
-        m = simulate_mycelium_to_n(b1, 0.006, 500, print_time=False)
-        S = coordinate(m)
-        M[:, i] += [ray(S), n_cross(S), m.n_apex() - 2]
-    M[:, i] /= n_myc
-    print(f"end: {time() - t} s")
 
-N_int_nodes = M[1, :] + M[2, :]
+def role_b1(n_max = 500, B1, n_myc = 5):
+  """
+    Plots the radius and the number of internal nodes for differents values of b1
 
-plt.figure()
-plt.plot(B1, M[0, :], label = 'Rayon', linestyle = '--', marker = 'o')
-plt.title("Role of b1 in the ray of the surface covered by the mycelium")
-plt.xlabel('b1')
-plt.ylabel('R(b1)')
-plt.legend()
-plt.show()
+    Parameters
+    ----------
+    n_max (int): maximal number of branching to which we simulate the myc
+    B1 (List): list of value of b1
+    n_myc (int): Number of mycelium simulated. The default is 5.
 
-"""plt.figure()
-plt.plot(B1, M[1, :], label = 'N_cross', linestyle = '--', marker = 'o')
-plt.legend()
-plt.show()"""
+    Returns
+    -------
+    None.
 
-"""plt.figure()
-plt.scatter(B1, M[2, :], label = 'N_b', linestyle = '--', marker = 'o')
-plt.legend()
-plt.show()#inutile parce que les branchements sont fixés là"""
+    """
+    M = np.zeros((3, len(B1)))
+    for i in range(len(B1)):
+      t = time()
+      print(f"start {i}th it")
+      for j in range(n_myc):
+          b1 = B1[i]
+          m = simulate_mycelium_to_n(b1, 0.006, n_max, print_time=False)
+          S = coordinate(m)
+          M[:, i] += [rad(S), n_cross(S), m.n_apex() - 2]
+      M[:, i] /= n_myc
+      print(f"end: {time() - t} s")
+    
+    N_int_nodes = M[1, :] + M[2, :]
+    
+    plt.figure()
+    plt.plot(B1, M[0, :], label = 'Rayon', linestyle = '--', marker = 'o')
+    plt.title("Role of b1 in the radius of the surface covered by the mycelium")
+    plt.xlabel('b1')
+    plt.ylabel('R(b1)')
+    plt.legend()
+    plt.show()
+    
+    
+    plt.figure()
+    plt.plot(B1, N_int_nodes, label = 'N', linestyle = '--', marker = 'o')
+    plt.title("Role of b1 in the number of internal nodes of the mycelium")
+    plt.xlabel('b1')
+    plt.ylabel('R(b1)')
+    plt.legend()
+    plt.show()
 
-plt.figure()
-plt.plot(B1,N_int_nodes, label = 'N', linestyle = '--', marker = 'o')
-plt.title("Role of b1 in the number of internal nodes of the mycelium")
-plt.xlabel('b1')
-plt.ylabel('R(b1)')
-plt.legend()
-plt.show()
+
+role_b1(n_max, B1, n_myc)
 
 
 #%% Qualitative description of the role of b2
 
-B2 = [0.0005, 0.001, 0.003, 0.007, 0.01, 0.03]
+
 n_max = 500
-
 B2 = np.linspace(0.001, 0.03, 10)
-M1 = np.zeros((3, len(B2)))
 n_myc = 5
-for i in range(len(B2)):
-    t = time()
-    print(f"start {i}th it")
-    for j in range(n_myc):
-        b2 = B2[i]
-        m = simulate_mycelium_to_n(0.27, b2, 500, print_time=False)
-        S = coordinate(m)
-        M1[:, i] += [ray(S), n_cross(S), m.n_apex() - 1]
-    M1[:, i] /= n_myc
-    print(f"end: {time() - t} s")
 
-N_int_nodes = M1[1, :] + M1[2, :]
 
-plt.figure()
-plt.plot(B2, M1[0, :], label = 'Rayon', linestyle = '--', marker = 'o')
-plt.title("Role of b2 in the ray of the surface covered by the mycelium")
-plt.xlabel('b2')
-plt.ylabel('R(b2)')
-plt.legend()
-plt.show()
+def role_b2(n_max = n_max, B2 = B2, n_myc = 5):
+    """
+      Plots the radius and the number of internal nods for differents values of b2
 
-"""plt.figure()
-plt.plot(B1, M[1, :], label = 'N_cross', linestyle = '--', marker = 'o')
-plt.legend()
-plt.show()"""
+      Parameters
+      ----------
+      n_max (int): maximal number of branching to which we simulate the myc
+      B2 (List): list of value for b2
+      n_myc (int): Number of mycelium simulated. The default is 5.
 
-"""plt.figure()
-plt.scatter(B1, M[2, :], label = 'N_b', linestyle = '--', marker = 'o')
-plt.legend()
-plt.show()#inutile parce que les branchements sont fixés là"""
-
-plt.figure()
-plt.plot(B2,N_int_nodes, label = 'N', linestyle = '--', marker = 'o')
-plt.title("Role of b2 in the number of internal nodes of the mycelium")
-plt.xlabel('b2')
-plt.ylabel('R(b2)')
-plt.legend()
-plt.show()
-
+      Returns
+      -------
+      None.
+      
+      """
+    
+     M = np.zeros((3, len(B2)))
+     for i in range(len(B2)):
+        t = time()
+        print(f"start {i}th it")
+        for j in range(n_myc):
+            b2 = B2[i]
+            m = simulate_mycelium_to_n(0.27, b2, n_max, print_time=False)
+            S = coordinate(m)
+            M[:, i] += [rad(S), n_cross(S), m.n_apex() - 1]
+            
+        M[:, i] /= n_myc
+        print(f"end: {time() - t} s") 
+           
+           
+    N_int_nodes = M[1, :] + M[2, :]
+        
+    plt.figure()
+    plt.plot(B2, M[0, :], label = 'Rayon', linestyle = '--', marker = 'o')
+    plt.title("Role of b2 in the radius of the surface covered by the mycelium")
+    plt.xlabel('b2')
+    plt.ylabel('R(b2)')
+    plt.legend()
+    plt.show()
+        
+        
+    plt.figure()
+    plt.plot(B2,N_int_nodes, label = 'N', linestyle = '--', marker = 'o')
+    plt.title("Role of b2 in the number of internal nodes of the mycelium")
+    plt.xlabel('b2')
+    plt.ylabel('R(b2)')
+    plt.legend()
+    plt.show()
+    
+role_b2(n_max, B2, n_myc)
